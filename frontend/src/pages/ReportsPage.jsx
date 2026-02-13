@@ -9,6 +9,9 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 function GlassTooltip({ active, payload, label }) {
@@ -29,23 +32,51 @@ function GlassTooltip({ active, payload, label }) {
   );
 }
 
+function formatMoney(n) {
+  return `$${Number(n || 0).toFixed(2)}`;
+}
+function formatMoneyCompact(n) {
+  const x = Number(n || 0);
+  const abs = Math.abs(x);
+
+  if (abs >= 1_000_000) return `$${(x / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `$${(x / 1_000).toFixed(1)}k`;
+  return `$${x.toFixed(2)}`;
+}
+
+function toPieData(byPayment = {}) {
+  return Object.entries(byPayment).map(([name, value]) => ({
+    name,
+    value: Number(value || 0),
+  }));
+}
+
+// colores glass (sin “colores fuertes”, pero diferenciables)
+const PIE_COLORS = [
+  "rgba(255,255,255,0.85)",
+  "rgba(255,255,255,0.65)",
+  "rgba(255,255,255,0.45)",
+  "rgba(255,255,255,0.30)",
+  "rgba(255,255,255,0.22)",
+  "rgba(255,255,255,0.15)",
+];
+
 export default function ReportsPage({
   reportFrom,
   reportTo,
   setReportFrom,
   setReportTo,
-
   summary,
   summaryLoading,
   daily,
   dailyLoading,
-
   loadSummary,
   loadDaily,
-
   getSalesCsvUrl,
   getSalesDailyCsvUrl,
 }) {
+  const pieData = toPieData(summary?.by_payment_method || {});
+
   return (
     <div className="mt-4">
       <Card title="Reportes">
@@ -144,50 +175,202 @@ export default function ReportsPage({
                 ) : daily.days.length === 0 ? (
                   <div className="mt-3 text-white/70 text-sm">Sin datos en el rango.</div>
                 ) : (
-                  <div className="mt-4 space-y-4">
-                    <div className="h-72 w-full rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={daily.days.map((d) => ({
-                            date: d.date.slice(5),
-                            total: Number(d.total),
-                            count: Number(d.count_sales),
-                          }))}
-                          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            stroke="rgba(255,255,255,0.08)"
-                            strokeDasharray="3 3"
-                          />
+                    <div className="mt-4 space-y-4">
+                        {/* KPIs del rango (requiere daily) */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        {(() => {
+                            const total = daily.days.reduce((acc, d) => acc + Number(d.total || 0), 0);
+                            const count = daily.days.reduce((acc, d) => acc + Number(d.count_sales || 0), 0);
+                            const avg = count > 0 ? total / count : 0;
 
-                          <XAxis
-                            dataKey="date"
-                            tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 12 }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
+                            const peak = daily.days.reduce(
+                            (best, d) => (Number(d.total || 0) > Number(best.total || 0) ? d : best),
+                            daily.days[0]
+                            );
 
-                          <YAxis
-                            tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 12 }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
+                            return (
+                            <>
+                                <Card title="Total del rango" className="bg-white/[0.02]">
+                                <div
+                                  className="text-2xl font-semibold text-white truncate"
+                                  title={formatMoney(total)}
+                                >
+                                  {formatMoneyCompact(total)}
+                                </div>
+                                <div className="text-xs text-white/60 mt-1">Suma de ventas por día</div>
+                                </Card>
 
-                          <Tooltip
-                            content={<GlassTooltip />}
-                            cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                          />
+                                <Card title="Ventas (rango)" className="bg-white/[0.02]">
+                                <div className="text-2xl font-semibold text-white">{count}</div>
+                                <div className="text-xs text-white/60 mt-1">Cantidad de tickets</div>
+                                </Card>
 
-                          <Bar
-                            dataKey="total"
-                            fill="rgba(255,255,255,0.75)"
-                            radius={[12, 12, 4, 4]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                                <Card title="Promedio por venta" className="bg-white/[0.02]">
+                                <div
+                                  className="text-2xl font-semibold text-white truncate"
+                                  title={formatMoney(avg)}
+                                >
+                                  {formatMoneyCompact(avg)}
+                                </div>
+                                <div className="text-xs text-white/60 mt-1">Total / cantidad</div>
+                                </Card>
+
+                                <Card title="Día pico" className="bg-white/[0.02]">
+                                <div className="text-lg font-semibold text-white">
+                                    {peak?.date ?? "-"}
+                                </div>
+                                <div className="text-sm text-white/80 mt-1">
+                                    {formatMoneyCompact(peak?.total ?? 0)} · {Number(peak?.count_sales ?? 0)} ventas
+                                </div>
+                                </Card>
+                            </>
+                            );
+                        })()}
+                        </div>
+
+                        {/* Grid charts */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* BarChart */}
+                        <div className="lg:col-span-2 h-72 w-full rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={daily.days.map((d) => ({
+                                date: d.date.slice(5),
+                                total: Number(d.total),
+                                count: Number(d.count_sales),
+                                }))}
+                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                            >
+                                <CartesianGrid
+                                stroke="rgba(255,255,255,0.08)"
+                                strokeDasharray="3 3"
+                                />
+
+                                <XAxis
+                                dataKey="date"
+                                tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 12 }}
+                                axisLine={false}
+                                tickLine={false}
+                                />
+
+                                <YAxis
+                                tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 12 }}
+                                axisLine={false}
+                                tickLine={false}
+                                />
+
+                                <Tooltip
+                                content={<GlassTooltip />}
+                                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                                />
+
+                                <Bar
+                                dataKey="total"
+                                fill="rgba(255,255,255,0.75)"
+                                radius={[12, 12, 4, 4]}
+                                />
+                            </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Donut por medio de pago (usa summary) */}
+                        <div className="lg:col-span-1 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                            <div className="text-sm font-semibold text-white/85 mb-2">
+                            Distribución por medio
+                            </div>
+
+                            {Object.keys(summary?.by_payment_method || {}).length === 0 ? (
+                            <div className="text-white/60 text-sm">Sin datos.</div>
+                            ) : (
+                            <>
+                                <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                    <Pie
+                                        data={pieData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        innerRadius={52}
+                                        outerRadius={78}
+                                        paddingAngle={2}
+                                    >
+                                        {pieData.map((_, idx) => (
+                                        <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const p = payload[0];
+                                        return (
+                                            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-md px-3 py-2 shadow-xl">
+                                            <div className="text-xs text-white/60">{p.name}</div>
+                                            <div className="text-sm text-white font-semibold">
+                                                {formatMoney(p.value)}
+                                            </div>
+                                            </div>
+                                        );
+                                        }}
+                                    />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                </div>
+
+                                {/* leyenda */}
+                                <div className="mt-3 space-y-2 text-sm">
+                                {pieData
+                                    .slice()
+                                    .sort((a, b) => b.value - a.value)
+                                    .map((it, idx) => (
+                                    <div key={it.name} className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                        <span
+                                            className="h-2.5 w-2.5 rounded-full border border-white/10"
+                                            style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }}
+                                        />
+                                        <span className="text-white/70 truncate">{it.name}</span>
+                                        </div>
+                                        <span className="text-white/90 font-medium">
+                                        {formatMoney(it.value)}
+                                        </span>
+                                    </div>
+                                    ))}
+                                </div>
+                            </>
+                            )}
+                        </div>
+                        </div>
+
+                        {/* Top días */}
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                        <div className="text-sm font-semibold text-white/85 mb-2">Top días (por total)</div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                            {daily.days
+                            .slice()
+                            .sort((a, b) => Number(b.total || 0) - Number(a.total || 0))
+                            .slice(0, 5)
+                            .map((d) => (
+                                <div
+                                key={d.date}
+                                className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
+                                >
+                                <div className="text-xs text-white/60">{d.date}</div>
+                                <div
+                                  className="text-lg font-semibold text-white truncate"
+                                  title={formatMoney(d.total)}
+                                >
+                                  {formatMoneyCompact(d.total)}
+                                </div>
+                                <div className="text-xs text-white/70 mt-1">
+                                    {Number(d.count_sales)} ventas
+                                </div>
+                                </div>
+                            ))}
+                        </div>
+                        </div>
                     </div>
-                  </div>
-                )}
+                    )}
               </Card>
             </div>
           )}

@@ -259,6 +259,9 @@ export default function App() {
           productForm={productForm}
           setProductForm={setProductForm}
           submitProduct={submitProduct}
+          refreshProducts={refreshProducts}
+          toast={toast}
+          setErr={setErr}
         />
       )}
 

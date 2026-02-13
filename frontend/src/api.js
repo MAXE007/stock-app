@@ -19,6 +19,21 @@ export async function createProduct(payload) {
   return res.json();
 }
 
+export async function updateProduct(id, payload) {
+  const res = await fetch(`${API_BASE}/products/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Error actualizando producto");
+  }
+
+  return res.json();
+}
+
 export async function createSale(payload) {
   const res = await fetch(`${API_BASE}/sales`, {
     method: "POST",
