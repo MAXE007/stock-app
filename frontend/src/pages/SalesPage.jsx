@@ -161,7 +161,8 @@ export default function SalesPage({
                     <div className="min-w-0">
                       <div className="text-white font-medium truncate">{it.name}</div>
                       <div className="text-xs text-white/60">
-                        ${it.unit_price} · Subtotal: ${(it.qty * it.unit_price).toFixed(2)}
+                        ${(it.price ?? it.unit_price).toFixed?.(2) ?? (it.price ?? it.unit_price)} · Subtotal: ${(
+                        it.qty * Number(it.price ?? it.unit_price ?? 0)).toFixed(2)}
                       </div>
                     </div>
 

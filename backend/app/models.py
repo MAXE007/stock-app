@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import String, Integer, Numeric, DateTime, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
+from sqlalchemy import Boolean
 
 class Product(Base):
     __tablename__ = "products"
@@ -14,6 +15,8 @@ class Product(Base):
     cost: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     stock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_min: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp()

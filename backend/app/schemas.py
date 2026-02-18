@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -16,6 +17,7 @@ class ProductUpdate(BaseModel):
     cost: Optional[float] = Field(default=None, ge=0)
     stock: Optional[int] = Field(default=None, ge=0)
     stock_min: Optional[int] = Field(default=None, ge=0)
+    is_active: Optional[bool] = None
 
 class ProductOut(BaseModel):
     id: int
@@ -25,6 +27,9 @@ class ProductOut(BaseModel):
     cost: float
     stock: int
     stock_min: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -32,7 +37,6 @@ class ProductOut(BaseModel):
 class SaleItemCreate(BaseModel):
     product_id: int
     qty: int = Field(gt=0)
-    unit_price: float = Field(ge=0)
 
 class SaleCreate(BaseModel):
     payment_method: str = Field(default="UNSPECIFIED", max_length=32)

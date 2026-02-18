@@ -183,7 +183,6 @@ export default function App() {
       .map((it) => ({
         product_id: it.product_id,
         qty: Number(it.qty),
-        unit_price: Number(it.unit_price),
       }));
 
     if (items.length === 0) {

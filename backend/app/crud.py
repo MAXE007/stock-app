@@ -1,72 +1,110 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from .models import Product, Sale, SaleItem
 from .schemas import ProductCreate, ProductUpdate, SaleCreate
 from datetime import datetime, date, time, timedelta
-from sqlalchemy import select
 
 def create_product(db: Session, data: ProductCreate) -> Product:
     p = Product(**data.model_dump())
     db.add(p)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # SKU unique
+        raise ValueError("SKU ya existe")
     db.refresh(p)
     return p
 
-def list_products(db: Session) -> list[Product]:
-    return db.query(Product).order_by(Product.id.desc()).all()
+def list_products(db: Session, include_inactive: bool = False) -> list[Product]:
+    q = db.query(Product)
+    if not include_inactive:
+        q = q.filter(Product.is_active == True)
+    return q.order_by(Product.id.desc()).all()
 
-def get_product(db: Session, product_id: int) -> Product | None:
-    return db.query(Product).filter(Product.id == product_id).first()
+def get_product(db: Session, product_id: int, include_inactive: bool = False) -> Product | None:
+    q = db.query(Product).filter(Product.id == product_id)
+    if not include_inactive:
+        q = q.filter(Product.is_active == True)
+    return q.first()
 
 def update_product(db: Session, product_id: int, data: ProductUpdate) -> Product | None:
-    p = get_product(db, product_id)
+    p = get_product(db, product_id)  # no incluye inactivos
     if not p:
         return None
+
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     for k, v in updates.items():
         setattr(p, k, v)
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("SKU ya existe")
     db.refresh(p)
     return p
 
 def delete_product(db: Session, product_id: int) -> bool:
-    p = get_product(db, product_id)
+    p = get_product(db, product_id)  # no incluye inactivos
     if not p:
         return False
-    db.delete(p)
+    p.is_active = False
     db.commit()
+    db.refresh(p)
     return True
 
 def create_sale(db: Session, data: SaleCreate) -> Sale:
-    # Validar productos y stock
-    products_map: dict[int, Product] = {}
-    for it in data.items:
-        p = db.query(Product).filter(Product.id == it.product_id).first()
-        if not p:
-            raise ValueError(f"Producto {it.product_id} no existe")
-        if p.stock < it.qty:
-            raise ValueError(f"Stock insuficiente para '{p.name}'. Disponible: {p.stock}, pedido: {it.qty}")
-        products_map[it.product_id] = p
+    try:
+        with db.begin():  # transacción atómica
+            products_map: dict[int, Product] = {}
 
-    # Calcular total
-    total = sum((it.qty * it.unit_price) for it in data.items)
+            # Validar productos y stock (y que no estén archivados)
+            for it in data.items:
+                p = (
+                    db.query(Product)
+                    .filter(Product.id == it.product_id, Product.is_active == True)
+                    .first()
+                )
+                if not p:
+                    raise ValueError(f"Producto {it.product_id} no existe o está archivado")
+                if p.stock < it.qty:
+                    raise ValueError(
+                        f"Stock insuficiente para '{p.name}'. Disponible: {p.stock}, pedido: {it.qty}"
+                    )
+                products_map[it.product_id] = p
 
-    sale = Sale(total=total, payment_method=data.payment_method)
-    db.add(sale)
-    db.flush()  # para tener sale.id
+            # Calcular total con precio server-side
+            total = 0.0
+            sale = Sale(total=0, payment_method=data.payment_method)
+            db.add(sale)
+            db.flush()  # para obtener sale.id
 
-    # Crear items y descontar stock
-    for it in data.items:
-        db.add(SaleItem(
-            sale_id=sale.id,
-            product_id=it.product_id,
-            qty=it.qty,
-            unit_price=it.unit_price,
-        ))
-        products_map[it.product_id].stock -= it.qty
+            # Crear items, congelar unit_price desde Product.price y descontar stock
+            for it in data.items:
+                p = products_map[it.product_id]
+                unit_price = float(p.price)  # precio actual del producto
+                line_total = float(it.qty) * unit_price
+                total += line_total
 
-    db.commit()
-    db.refresh(sale)
-    return sale
+                db.add(
+                    SaleItem(
+                        sale_id=sale.id,
+                        product_id=p.id,
+                        qty=it.qty,
+                        unit_price=unit_price,
+                    )
+                )
+                p.stock -= it.qty
+
+            sale.total = round(total, 2)
+
+        db.refresh(sale)
+        return sale
+
+    except ValueError:
+        raise
 
 def list_sales(db: Session) -> list[Sale]:
     return db.query(Sale).order_by(Sale.id.desc()).all()

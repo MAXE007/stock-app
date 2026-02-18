@@ -9,8 +9,6 @@ from fastapi.responses import StreamingResponse
 import csv
 import io
 
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Stock App API")
 
 app.add_middleware(
@@ -27,11 +25,17 @@ def health():
 
 @app.post("/products", response_model=schemas.ProductOut)
 def create_product(payload: schemas.ProductCreate, db: Session = Depends(get_db)):
-    return crud.create_product(db, payload)
+    try:
+        return crud.create_product(db, payload)
+    except ValueError as e:
+        msg = str(e)
+        if "SKU ya existe" in msg:
+            raise HTTPException(status_code=409, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
 @app.get("/products", response_model=list[schemas.ProductOut])
-def list_products(db: Session = Depends(get_db)):
-    return crud.list_products(db)
+def list_products(include_inactive: bool = False, db: Session = Depends(get_db)):
+    return crud.list_products(db, include_inactive=include_inactive)
 
 @app.get("/products/{product_id}", response_model=schemas.ProductOut)
 def get_product(product_id: int, db: Session = Depends(get_db)):
@@ -42,7 +46,14 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
 
 @app.patch("/products/{product_id}", response_model=schemas.ProductOut)
 def update_product(product_id: int, payload: schemas.ProductUpdate, db: Session = Depends(get_db)):
-    p = crud.update_product(db, product_id, payload)
+    try:
+        p = crud.update_product(db, product_id, payload)
+    except ValueError as e:
+        msg = str(e)
+        if "SKU ya existe" in msg:
+            raise HTTPException(status_code=409, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
     return p
