@@ -72,3 +72,22 @@ export async function getSalesDaily(from, to) {
 export function getSalesDailyCsvUrl(from, to) {
   return `${API_BASE}/reports/sales/daily/export.csv?from=${from}&to=${to}`;
 }
+
+export async function adjustStock(productId, payload) {
+  const res = await fetch(`${API_BASE}/products/${productId}/stock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Error ajustando stock");
+  }
+  return res.json();
+}
+
+export async function getStockMovements(productId) {
+  const res = await fetch(`${API_BASE}/products/${productId}/stock-movements`);
+  if (!res.ok) throw new Error("Error obteniendo movimientos");
+  return res.json();
+}

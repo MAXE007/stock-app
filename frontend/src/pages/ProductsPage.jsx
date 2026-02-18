@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Card from "../ui/Card";
 import Button from "../ui/Button";
-import { updateProduct } from "../api";
+import { updateProduct, adjustStock, getStockMovements } from "../api";
 
 export default function ProductsPage({
   products,
@@ -24,6 +24,12 @@ export default function ProductsPage({
   const [editId, setEditId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // ----------------- Movimientos (modal) -----------------
+  const [movOpen, setMovOpen] = useState(false);
+  const [movProduct, setMovProduct] = useState(null);
+  const [movLoading, setMovLoading] = useState(false);
+  const [movements, setMovements] = useState([]);
 
   const filteredProducts = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -93,6 +99,7 @@ export default function ProductsPage({
       cost: Number(p.cost ?? 0),
       stock: Number(p.stock ?? 0),
       stock_min: Number(p.stock_min ?? 0),
+      original_stock: Number(p.stock ?? 0),
     });
   }
 
@@ -110,19 +117,35 @@ export default function ProductsPage({
       return;
     }
 
-    const payload = {
+    const nextStock = Math.max(0, Number(draft.stock) || 0);
+    const prevStock = Math.max(0, Number(draft.original_stock) || 0);
+    const diff = nextStock - prevStock;
+
+    // PATCH solo “datos maestros” (sin stock)
+    const patchPayload = {
       name: String(draft.name).trim(),
       sku: String(draft.sku || "").trim() || null,
       price: Number(draft.price) || 0,
       cost: Number(draft.cost) || 0,
-      stock: Math.max(0, Number(draft.stock) || 0),
       stock_min: Math.max(0, Number(draft.stock_min) || 0),
     };
 
     try {
       setSaving(true);
-      await updateProduct(id, payload);   // <-- GUARDA EN BACKEND
-      await refreshProducts();           // <-- REFRESCA LISTA
+
+      // 1) actualizar campos maestros
+      await updateProduct(id, patchPayload);
+
+      // 2) si cambió el stock, registrar movimiento (auditable)
+      if (diff !== 0) {
+        await adjustStock(id, {
+          change: diff,
+          reason: "ADJUSTMENT",
+          note: "Edit inline",
+        });
+      }
+
+      await refreshProducts();
       toast?.("Producto actualizado ✅");
       cancelEdit();
     } catch (e) {
@@ -131,6 +154,30 @@ export default function ProductsPage({
       setSaving(false);
     }
   }
+
+  async function openMovements(p) {
+    setErr?.("");
+    setMovOpen(true);
+    setMovProduct(p);
+    setMovLoading(true);
+    setMovements([]);
+
+    try {
+      const data = await getStockMovements(p.id);
+      setMovements(data);
+    } catch (e) {
+      setErr?.(e.message || "Error obteniendo movimientos");
+    } finally {
+      setMovLoading(false);
+    }
+  }
+
+  function closeMovements() {
+    setMovOpen(false);
+    setMovProduct(null);
+    setMovements([]);
+  }
+
 
   return (
     <div className="mt-4">
@@ -407,9 +454,14 @@ export default function ProductsPage({
 
                         <td className="px-3 py-2 text-right">
                           {!isEditing ? (
-                            <Button type="button" onClick={() => startEdit(p)}>
-                              Editar
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button type="button" onClick={() => openMovements(p)}>
+                                Movimientos
+                              </Button>
+                              <Button type="button" onClick={() => startEdit(p)}>
+                                Editar
+                              </Button>
+                            </div>
                           ) : (
                             <div className="flex justify-end gap-2">
                               <Button type="button" onClick={cancelEdit} disabled={saving}>
@@ -434,6 +486,81 @@ export default function ProductsPage({
             </div>
           )}
         </div>
+        {movOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* overlay */}
+            <div
+              className="absolute inset-0 bg-black/60"
+              onClick={closeMovements}
+            />
+
+            {/* modal */}
+            <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-neutral-950/80 backdrop-blur-xl shadow-2xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                <div>
+                  <div className="text-white font-semibold">
+                    Movimientos de stock
+                  </div>
+                  <div className="text-xs text-white/60">
+                    {movProduct ? `${movProduct.name} (ID ${movProduct.id})` : ""}
+                  </div>
+                </div>
+                <Button onClick={closeMovements}>Cerrar</Button>
+              </div>
+
+              <div className="p-5">
+                {movLoading ? (
+                  <div className="text-white/70">Cargando movimientos...</div>
+                ) : movements.length === 0 ? (
+                  <div className="text-white/60">No hay movimientos para este producto.</div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-white/10">
+                    <table className="w-full text-sm">
+                      <thead className="bg-white/5 text-white/70">
+                        <tr className="text-left">
+                          <th className="px-3 py-2">Fecha</th>
+                          <th className="px-3 py-2">Razón</th>
+                          <th className="px-3 py-2">Cambio</th>
+                          <th className="px-3 py-2">Referencia</th>
+                          <th className="px-3 py-2">Nota</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {movements.map((m) => {
+                          const change = Number(m.change || 0);
+                          const isPos = change > 0;
+
+                          return (
+                            <tr key={m.id} className="hover:bg-white/[0.03]">
+                              <td className="px-3 py-2 text-white/80">
+                                {m.created_at ? new Date(m.created_at).toLocaleString() : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-white/80">{m.reason}</td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className={
+                                    "inline-flex items-center rounded-full px-2 py-1 text-xs border " +
+                                    (isPos
+                                      ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                                      : "border-pink-400/30 bg-pink-400/10 text-pink-200")
+                                  }
+                                >
+                                  {isPos ? `+${change}` : `${change}`}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-white/70">{m.reference || "-"}</td>
+                              <td className="px-3 py-2 text-white/70">{m.note || "-"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -164,3 +164,20 @@ def report_sales_daily_export_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+    
+@app.post("/products/{product_id}/stock", response_model=schemas.ProductOut)
+def adjust_product_stock(product_id: int, payload: schemas.StockAdjust, db: Session = Depends(get_db)):
+    try:
+        return crud.adjust_stock(
+            db,
+            product_id=product_id,
+            change=payload.change,
+            reason=payload.reason,
+            note=payload.note,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@app.get("/products/{product_id}/stock-movements", response_model=list[schemas.StockMovementOut])
+def get_product_stock_movements(product_id: int, db: Session = Depends(get_db)):
+    return crud.list_stock_movements(db, product_id)

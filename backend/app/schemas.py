@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from typing import Literal
+from datetime import datetime
+
+StockReason = Literal["SALE", "RESTOCK", "ADJUSTMENT"]
 
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -55,6 +59,23 @@ class SaleOut(BaseModel):
     total: float
     payment_method: str
     items: list[SaleItemOut]
+
+    class Config:
+        from_attributes = True
+
+class StockAdjust(BaseModel):
+    change: int = Field(..., description="positivo suma, negativo resta")
+    reason: StockReason = "ADJUSTMENT"
+    note: Optional[str] = Field(default=None, max_length=255)
+
+class StockMovementOut(BaseModel):
+    id: int
+    product_id: int
+    change: int
+    reason: str
+    reference: Optional[str]
+    note: Optional[str]
+    created_at: datetime
 
     class Config:
         from_attributes = True

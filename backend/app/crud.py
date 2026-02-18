@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from .models import Product, Sale, SaleItem
+from .models import Product, Sale, SaleItem, StockMovement
 from .schemas import ProductCreate, ProductUpdate, SaleCreate
 from datetime import datetime, date, time, timedelta
 
@@ -88,15 +88,22 @@ def create_sale(db: Session, data: SaleCreate) -> Sale:
                 line_total = float(it.qty) * unit_price
                 total += line_total
 
-                db.add(
-                    SaleItem(
-                        sale_id=sale.id,
-                        product_id=p.id,
-                        qty=it.qty,
-                        unit_price=unit_price,
-                    )
-                )
+                db.add(SaleItem(
+                    sale_id=sale.id,
+                    product_id=p.id,
+                    qty=it.qty,
+                    unit_price=unit_price,
+                ))
+                
                 p.stock -= it.qty
+                
+                db.add(StockMovement(
+                    product_id=p.id,
+                    change=-int(it.qty),
+                    reason="SALE",
+                    reference=f"sale:{sale.id}",
+                    note=None,
+                ))
 
             sale.total = round(total, 2)
 
@@ -207,3 +214,37 @@ def sales_daily(db, from_date: date, to_date: date) -> list[dict]:
         out.append(row)
 
     return out
+
+def adjust_stock(db: Session, product_id: int, change: int, reason: str = "ADJUSTMENT", note: str | None = None) -> Product:
+    if change == 0:
+        raise ValueError("El cambio no puede ser 0")
+
+    p = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
+    if not p:
+        raise ValueError("Producto no existe o está archivado")
+
+    new_stock = int(p.stock) + int(change)
+    if new_stock < 0:
+        raise ValueError(f"Stock insuficiente. Stock actual: {p.stock}, cambio: {change}")
+
+    # ✅ una sola transacción (la de la sesión)
+    p.stock = new_stock
+    db.add(StockMovement(
+        product_id=p.id,
+        change=int(change),
+        reason=reason,
+        reference="manual",
+        note=note,
+    ))
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+def list_stock_movements(db: Session, product_id: int) -> list[StockMovement]:
+    return (
+        db.query(StockMovement)
+        .filter(StockMovement.product_id == product_id)
+        .order_by(StockMovement.id.desc())
+        .all()
+    )
