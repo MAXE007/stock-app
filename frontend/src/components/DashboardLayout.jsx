@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "../ui/sidebar";
 import { LayoutDashboard, ShoppingCart, Package, BarChart3 } from "lucide-react";
+import { useAuth } from "../auth/AuthContext";
+
+
 
 function Logo({ open }) {
   return (
@@ -18,12 +21,16 @@ function Logo({ open }) {
 
 export default function DashboardLayout({ tab, setTab, children }) {
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const links = [
     { key: "sales", label: "Ventas", icon: <ShoppingCart size={18} className="text-white/80" /> },
     { key: "products", label: "Productos", icon: <Package size={18} className="text-white/80" /> },
     { key: "reports", label: "Reportes", icon: <BarChart3 size={18} className="text-white/80" /> },
   ];
+
+  const title = tab === "sales" ? "Ventas" : tab === "products" ? "Productos" : "Reportes";
 
   return (
     <div className="min-h-screen bg-[#0b0b0f] text-white">
@@ -47,20 +54,15 @@ export default function DashboardLayout({ tab, setTab, children }) {
                     {links.map((l) => (
                       <SidebarLink
                         key={l.key}
-                        link={{
-                          label: l.label,
-                          href: "#",
-                          icon: l.icon,
-                        }}
+                        link={{ label: l.label, href: "#", icon: l.icon }}
                         className={tab === l.key ? "bg-white/5 border border-white/10" : ""}
                         onClick={() => setTab(l.key)}
                       />
                     ))}
                   </div>
                 </div>
-                <div className="text-xs text-white/50">
-                  {open ? "Local demo · Admin" : " "}
-                </div>
+
+                <div className="text-xs text-white/50">{open ? "Local demo" : " "}</div>
               </SidebarBody>
             </Sidebar>
 
@@ -70,14 +72,36 @@ export default function DashboardLayout({ tab, setTab, children }) {
                 <div className="flex items-center gap-2">
                   <LayoutDashboard size={18} className="text-white/70" />
                   <div>
-                    <div className="text-sm font-semibold">
-                      {tab === "sales" ? "Ventas" : tab === "products" ? "Productos" : "Reportes"}
-                    </div>
+                    <div className="text-sm font-semibold">{title}</div>
                     <div className="text-xs text-white/55">Vista principal</div>
                   </div>
                 </div>
-              </div>
 
+                {/* user avatar */}
+                <div className="relative">
+                  <button
+                    onClick={() => setMenuOpen(!menuOpen)}
+                    className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 font-semibold"
+                  >
+                    {user?.email?.[0]?.toUpperCase() || "U"}
+                  </button>
+
+                  {menuOpen && (
+                    <div className="absolute right-0 mt-2 w-52 rounded-xl border border-white/10 bg-[#111116] shadow-xl p-3 z-50">
+                      <div className="text-xs text-white/60 truncate mb-2">
+                        {user?.email}
+                      </div>
+
+                      <button
+                        onClick={logout}
+                        className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-white/10"
+                      >
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="mt-4">{children}</div>
             </main>
           </div>

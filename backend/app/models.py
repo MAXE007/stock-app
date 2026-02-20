@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, Numeric, DateTime, func, ForeignKey
+from sqlalchemy import String, Integer, Numeric, DateTime, func, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 from sqlalchemy import Boolean
@@ -9,7 +9,7 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    sku: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     cost: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
@@ -26,6 +26,9 @@ class Product(Base):
         server_default=func.current_timestamp(),
         onupdate=func.current_timestamp(),
     )
+    
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    owner: Mapped["User"] = relationship()
 
 class Sale(Base):
     __tablename__ = "sales"
@@ -39,7 +42,9 @@ class Sale(Base):
     )
 
     items: Mapped[list["SaleItem"]] = relationship(back_populates="sale", cascade="all, delete-orphan")
-
+    
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    user: Mapped["User"] = relationship()
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
@@ -77,3 +82,19 @@ class StockMovement(Base):
     )
 
     product: Mapped["Product"] = relationship()
+    
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    user: Mapped["User"] = relationship()
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )

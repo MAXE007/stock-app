@@ -1,5 +1,6 @@
 import Card from "../ui/Card";
 import Button from "../ui/Button";
+import { downloadSalesCsv, downloadSalesDailyCsv } from "../api";
 
 import {
   ResponsiveContainer,
@@ -72,10 +73,36 @@ export default function ReportsPage({
   dailyLoading,
   loadSummary,
   loadDaily,
-  getSalesCsvUrl,
-  getSalesDailyCsvUrl,
 }) {
   const pieData = toPieData(summary?.by_payment_method || {});
+
+async function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+  async function onExportCsv() {
+    try {
+      const blob = await downloadSalesCsv(reportFrom, reportTo);
+      await downloadBlob(blob, `ventas_${reportFrom}_a_${reportTo}.csv`);
+    } catch (e) {
+      // si tenés toast mejor usarlo; si no:
+      alert(e.message || "Error exportando CSV");
+    }
+  }
+
+  async function onExportDailyCsv() {
+    try {
+      const blob = await downloadSalesDailyCsv(reportFrom, reportTo);
+      await downloadBlob(blob, `ventas_diarias_${reportFrom}_a_${reportTo}.csv`);
+    } catch (e) {
+      alert(e.message || "Error exportando CSV diario");
+    }
+  }
 
   return (
     <div className="mt-4">
@@ -106,9 +133,9 @@ export default function ReportsPage({
               {summaryLoading ? "Cargando..." : "Ver resumen"}
             </Button>
 
-            <a href={getSalesCsvUrl(reportFrom, reportTo)} className="inline-block">
-              <Button type="button">Exportar CSV</Button>
-            </a>
+            <Button type="button" onClick={onExportCsv}>
+              Exportar CSV
+            </Button>
           </div>
         </div>
 
@@ -163,9 +190,9 @@ export default function ReportsPage({
                     {dailyLoading ? "Cargando..." : "Ver diario"}
                   </Button>
 
-                  <a href={getSalesDailyCsvUrl(reportFrom, reportTo)} className="inline-block">
-                    <Button type="button">Exportar diario CSV</Button>
-                  </a>
+                  <Button type="button" onClick={onExportDailyCsv}>
+                    Exportar diario CSV
+                  </Button>
                 </div>
 
                 {!daily ? (

@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
 from typing import Literal
 from datetime import datetime
 
@@ -79,3 +78,19 @@ class StockMovementOut(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class UserOut(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserRegister(BaseModel):
+    email: str = Field(..., min_length=5, max_length=255)
+    password: str = Field(..., min_length=6, max_length=72)
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
