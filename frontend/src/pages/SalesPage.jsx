@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import Card from "../ui/Card";
 import Button from "../ui/Button";
 import KPI from "../ui/KPI";
@@ -58,6 +58,71 @@ export default function SalesPage({
     setMaxTotal("");
   }
 
+  // ----------------- Buscador rápido (Caja) -----------------
+  const [quickSearch, setQuickSearch] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  function handleQuickAdd() {
+    const term = quickSearch.trim().toLowerCase();
+    if (!term) return;
+
+    // 1️⃣ Buscar SKU exacto
+    const skuMatch = products.find(
+      (p) => p.sku?.toLowerCase() === term
+    );
+
+    if (skuMatch) {
+      if (skuMatch.stock <= 0) {
+        alert("Producto sin stock");
+        setQuickSearch("");
+        return;
+      }
+
+      addToCart(skuMatch.id);
+      setQuickSearch("");
+      setSuggestions([]);
+      setActiveIndex(0);
+      return;
+    }
+
+    // Buscar por nombre parcial
+    const nameMatches = products.filter((p) =>
+      p.name.toLowerCase().includes(term)
+    );
+
+    if (nameMatches.length === 0) {
+      alert("Producto no encontrado");
+      setQuickSearch("");
+      setSuggestions([]);
+      setActiveIndex(-1);
+      return;
+    }
+
+    if (nameMatches.length === 1) {
+      if (nameMatches[0].stock <= 0) {
+        alert("Producto sin stock");
+        setQuickSearch("");
+        return;
+      }
+
+      addToCart(nameMatches[0].id);
+      setQuickSearch("");
+      setSuggestions([]);
+      setActiveIndex(-1);
+      return;
+    }
+
+    // Si hay varios → mostrar lista
+    setSuggestions(nameMatches.slice(0, 5)); // máximo 5 sugerencias
+    setActiveIndex(0);
+  }
+
   return (
     <div className="space-y-6">
       {/* KPIs */}
@@ -113,7 +178,92 @@ export default function SalesPage({
 
           <div className="mt-5">
             <div className="text-sm font-semibold text-white/85 mb-2">Agregar productos</div>
+            <div className="mb-3 relative">
+              <input
+                ref={inputRef}
+                value={quickSearch}
+                onChange={(e) => {
+                  setQuickSearch(e.target.value);
+                  setSuggestions([]);
+                  setActiveIndex(-1);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    if (suggestions.length > 0) {
+                      setActiveIndex((prev) =>
+                        prev < suggestions.length - 1 ? prev + 1 : 0
+                      );
+                    }
+                  }
 
+                  else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    if (suggestions.length > 0) {
+                      setActiveIndex((prev) =>
+                        prev > 0 ? prev - 1 : suggestions.length - 1
+                      );
+                    }
+                  }
+
+                  else if (e.key === "Enter") {
+                    if (suggestions.length > 0 && activeIndex >= 0) {
+                      const selected = suggestions[activeIndex];
+
+                      if (selected.stock <= 0) {
+                        alert("Producto sin stock");
+                        return;
+                      }
+
+                      addToCart(selected.id);
+                      setQuickSearch("");
+                      setSuggestions([]);
+                      setActiveIndex(-1);
+                    } else {
+                      handleQuickAdd();
+                    }
+                  }
+
+                  else if (e.key === "Escape") {
+                    setSuggestions([]);
+                    setActiveIndex(-1);
+                  }
+                }}
+                placeholder="Escanear SKU o escribir nombre y presionar Enter..."
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none
+                          focus:border-white/20 focus:ring-2 focus:ring-white/10"
+              />
+
+              {/* Dropdown sugerencias */}
+              {suggestions.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full rounded-xl border border-white/10 bg-neutral-900 shadow-xl">
+                  {suggestions.map((p, index) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        if (p.stock <= 0) {
+                          alert("Producto sin stock");
+                          return;
+                        }
+
+                        addToCart(p.id);
+                        setQuickSearch("");
+                        setSuggestions([]);
+                      }}
+                      className={`
+                        w-full text-left px-4 py-3 border-b border-white/5 last:border-none
+                        ${activeIndex === index ? "bg-white/10" : "hover:bg-white/5"}
+                      `}
+                    >
+                      <div className="text-white font-medium">{p.name}</div>
+                      <div className="text-xs text-white/60">
+                        SKU: {p.sku} — ${p.price} — Stock: {p.stock}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {productsLoading ? (
               <div className="text-white/70">Cargando productos...</div>
             ) : (
