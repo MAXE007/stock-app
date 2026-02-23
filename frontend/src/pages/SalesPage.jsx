@@ -123,6 +123,73 @@ export default function SalesPage({
     setActiveIndex(0);
   }
 
+  // Modal confirmacion de venta, "ESC" = Salir , "ENTER" = Confirmar
+
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Ticket venta
+  function printTicket() {
+    const content = `
+      <html>
+        <head>
+          <title>Ticket</title>
+          <style>
+            body { font-family: monospace; padding: 20px; }
+            h2 { margin-bottom: 10px; }
+            .line { display: flex; justify-content: space-between; }
+            .total { font-weight: bold; margin-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <h2>Ticket de Venta</h2>
+          ${cart
+            .map(
+              (it) => `
+              <div class="line">
+                <span>${it.name} x${it.qty}</span>
+                <span>$${(it.qty * Number(it.price ?? it.unit_price ?? 0)).toFixed(2)}</span>
+              </div>
+            `
+            )
+            .join("")}
+          <div class="total">
+            Total: $${cartTotal.toFixed(2)}
+          </div>
+          <div>Pago: ${paymentMethod}</div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "", "width=400,height=600");
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.print();
+  }
+
+  function handleConfirm() {
+    printTicket();       // imprime usando el estado actual
+    confirmSale();       // después limpia el carrito
+    setShowConfirmModal(false);
+  }
+
+  useEffect(() => {
+    function handleKey(e) {
+      if (!showConfirmModal) return;
+
+      if (e.key === "Escape") {
+        setShowConfirmModal(false);
+      }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleConfirm();
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [showConfirmModal, handleConfirm]);
+
   return (
     <div className="space-y-6">
       {/* KPIs */}
@@ -335,7 +402,13 @@ export default function SalesPage({
             <div className="mt-4 flex items-center justify-between">
               <div className="text-white font-semibold text-lg">Total: ${cartTotal.toFixed(2)}</div>
 
-              <Button onClick={confirmSale} variant="primary">
+              <Button
+                onClick={() => {
+                  if (cart.length === 0) return;
+                  setShowConfirmModal(true);
+                }}
+                variant="primary"
+              >
                 Confirmar venta
               </Button>
             </div>
@@ -459,6 +532,53 @@ export default function SalesPage({
           )}
         </Card>
       </div>
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-neutral-900 border border-white/10 p-6 shadow-2xl">
+            
+            <div className="text-xl font-semibold text-white mb-4">
+              Confirmar venta
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
+              {cart.map((it) => (
+                <div key={it.product_id} className="flex justify-between text-sm text-white/80">
+                  <span>
+                    {it.name} x{it.qty}
+                  </span>
+                  <span>
+                    ${(it.qty * Number(it.price ?? it.unit_price ?? 0)).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <div className="text-sm text-white/60">Medio de pago</div>
+              <div className="text-white font-semibold mb-2">{paymentMethod}</div>
+
+              <div className="text-lg font-bold text-white">
+                Total: ${cartTotal.toFixed(2)}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancelar
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={handleConfirm}
+              >
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
