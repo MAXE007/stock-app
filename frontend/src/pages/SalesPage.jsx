@@ -129,6 +129,11 @@ export default function SalesPage({
 
   // Ticket venta
   function printTicket() {
+    const date = now.toLocaleDateString("es-AR");
+    const time = now.toLocaleTimeString("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const content = `
       <html>
         <head>
@@ -142,6 +147,9 @@ export default function SalesPage({
         </head>
         <body>
           <h2>Ticket de Venta</h2>
+          <div>Fecha: ${date}</div>
+          <div>Hora: ${time}</div>
+          <hr/>
           ${cart
             .map(
               (it) => `
@@ -167,7 +175,9 @@ export default function SalesPage({
   }
 
   function handleConfirm() {
-    printTicket();       // imprime usando el estado actual
+    if (import.meta.env.PROD) {
+      printTicket();
+    }       // imprime usando el estado actual
     confirmSale();       // después limpia el carrito
     setShowConfirmModal(false);
   }

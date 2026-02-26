@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from typing import Literal
 from datetime import datetime
@@ -34,8 +34,7 @@ class ProductOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SaleItemCreate(BaseModel):
     product_id: int
@@ -50,8 +49,7 @@ class SaleItemOut(BaseModel):
     qty: int
     unit_price: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SaleOut(BaseModel):
     id: int
@@ -59,8 +57,7 @@ class SaleOut(BaseModel):
     payment_method: str
     items: list[SaleItemOut]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StockAdjust(BaseModel):
     change: int = Field(..., description="positivo suma, negativo resta")
@@ -76,16 +73,14 @@ class StockMovementOut(BaseModel):
     note: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
         
 class UserOut(BaseModel):
     id: int
     email: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserRegister(BaseModel):
     email: str = Field(..., min_length=5, max_length=255)
