@@ -9,8 +9,6 @@ export default function ProductsPage({
   productForm,
   setProductForm,
   submitProduct,
-
-  // nuevos
   refreshProducts,
   toast,
   setErr,
@@ -18,7 +16,7 @@ export default function ProductsPage({
   // ----------------- Filtros/Listado -----------------
   const [q, setQ] = useState("");
   const [onlyLow, setOnlyLow] = useState(false);
-  const [sortBy, setSortBy] = useState("name_asc"); // name_asc | stock_asc | stock_desc | price_asc | price_desc
+  const [sortBy, setSortBy] = useState("name_asc");
 
   // ----------------- Inline edit -----------------
   const [editId, setEditId] = useState(null);
@@ -133,10 +131,8 @@ export default function ProductsPage({
     try {
       setSaving(true);
 
-      // 1) actualizar campos maestros
       await updateProduct(id, patchPayload);
 
-      // 2) si cambió el stock, registrar movimiento (auditable)
       if (diff !== 0) {
         await adjustStock(id, {
           change: diff,

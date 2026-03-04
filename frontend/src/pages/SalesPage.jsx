@@ -119,7 +119,7 @@ export default function SalesPage({
     }
 
     // Si hay varios → mostrar lista
-    setSuggestions(nameMatches.slice(0, 5)); // máximo 5 sugerencias
+    setSuggestions(nameMatches.slice(0, 5));
     setActiveIndex(0);
   }
 
@@ -129,6 +129,8 @@ export default function SalesPage({
 
   // Ticket venta
   function printTicket() {
+    const now = new Date();
+
     const date = now.toLocaleDateString("es-AR");
     const time = now.toLocaleTimeString("es-AR", {
       hour: "2-digit",

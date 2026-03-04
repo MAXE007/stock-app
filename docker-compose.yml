@@ -1,60 +1,81 @@
-version: "3.9"
-
 services:
 
   # =========================
-  # 🟢 BASE PRINCIPAL
+  #  BASE PRINCIPAL
   # =========================
   db:
     image: postgres:16
+    container_name: stock_db
     restart: always
     environment:
       POSTGRES_USER: stock
       POSTGRES_PASSWORD: stock
       POSTGRES_DB: stockdb
-    ports:
-      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stock"]
+      test: ["CMD-SHELL", "pg_isready -U stock -d stockdb"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - stock_network
 
   # =========================
   #  BASE PARA TESTS
   # =========================
   postgres_test:
     image: postgres:16
+    container_name: stock_test_db
     restart: always
     environment:
       POSTGRES_USER: stock
       POSTGRES_PASSWORD: stock
       POSTGRES_DB: stock_test
-    ports:
-      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stock"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - stock_network
+    profiles:
+      - test
 
   # =========================
-  #  BACKEND
+  #  BACKEND (PRODUCCIÓN)
   # =========================
   backend:
     build:
       context: ./backend
+    container_name: stock_backend
+    restart: always
     depends_on:
       db:
         condition: service_healthy
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql://stock:stock@db:5432/stockdb
+      DATABASE_URL: postgresql+psycopg://stock:stock@db:5432/stockdb
     ports:
       - "8000:8000"
+    networks:
+      - stock_network
+
+ # =========================
+  #  FRONTEND
+  # =========================
+  frontend:
+    build:
+      context: ./frontend
+    container_name: stock_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    networks:
+      - stock_network
 
   # =========================
   #  TEST RUNNER
@@ -65,13 +86,16 @@ services:
     depends_on:
       postgres_test:
         condition: service_healthy
-    env_file:
-      - ./backend/.env
     environment:
-      DATABASE_URL: postgresql://stock:stock@postgres_test:5432/stock_test
+      DATABASE_URL: postgresql+psycopg://stock:stock@postgres_test:5432/stock_test
     command: pytest -v
+    networks:
+      - stock_network
     profiles:
       - test
 
 volumes:
   pgdata:
+
+networks:
+  stock_network:

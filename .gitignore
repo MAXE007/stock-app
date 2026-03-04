@@ -8,15 +8,28 @@ backend/.mypy_cache/
 # SQLite (dev)
 backend/stock.db
 
-# ---- Node ----
+
 frontend/node_modules/
 frontend/dist/
 
-# ---- OS / Editor ----
+
 .DS_Store
 Thumbs.db
 .vscode/
 
-# ---- Env files ----
+
 .env
 .env.*
+
+# Docker volumes
+pgdata/
+postgres_data/
+
+# Logs
+*.log
+
+# Alembic cache
+backend/alembic/versions/__pycache__/
+
+# OS
+*.swp

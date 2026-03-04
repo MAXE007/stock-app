@@ -16,7 +16,7 @@ export default function RegisterPage() {
     setErr("");
     setLoading(true);
     try {
-      await register(email, password); // auto-login dentro del AuthContext
+      await register(email, password);
       nav("/app", { replace: true });
     } catch (e2) {
       setErr(e2.message || "Error");

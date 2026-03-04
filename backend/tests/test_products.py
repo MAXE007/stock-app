@@ -33,7 +33,6 @@ def test_sku_must_be_unique(client, auth_headers):
     assert r2.status_code == 409
     
 def test_users_cannot_see_other_users_products(client):
-    # Usuario 1
     client.post("/auth/register", json={
         "email": "u1@test.com",
         "password": "123456"
@@ -45,7 +44,6 @@ def test_users_cannot_see_other_users_products(client):
     token1 = r.json()["access_token"]
     headers1 = {"Authorization": f"Bearer {token1}"}
 
-    # Usuario 2
     client.post("/auth/register", json={
         "email": "u2@test.com",
         "password": "123456"
@@ -57,7 +55,6 @@ def test_users_cannot_see_other_users_products(client):
     token2 = r.json()["access_token"]
     headers2 = {"Authorization": f"Bearer {token2}"}
 
-    # Usuario 1 crea producto
     r = client.post(
         "/products",
         json={

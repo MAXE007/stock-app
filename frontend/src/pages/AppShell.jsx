@@ -121,7 +121,6 @@ export default function App() {
     setCart((prev) => {
       const existing = prev.find((x) => x.product_id === p.id);
       if (existing) {
-        // sumar 1, pero sin pasar el stock disponible
         const nextQty = Math.min(existing.qty + 1, p.stock);
         return prev.map((x) =>
           x.product_id === p.id ? { ...x, qty: nextQty } : x

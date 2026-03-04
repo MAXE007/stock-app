@@ -1,13 +1,11 @@
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
 from .models import Product, Sale, SaleItem, StockMovement, User
 from .schemas import ProductCreate, ProductUpdate, SaleCreate
 from datetime import datetime, date, time, timedelta
 from .auth import hash_password, verify_password
 
 def create_product(db: Session, user_id: int, data: ProductCreate) -> Product:
-    # SKU unique por usuario
+    # SKU unico por usuario
     if data.sku:
         exists = (
             db.query(Product)
@@ -43,7 +41,6 @@ def update_product(db: Session, user_id: int, product_id: int, data: ProductUpda
 
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
 
-    # si cambia sku, validar unique por user
     new_sku = updates.get("sku", None)
     if new_sku:
         exists = (
@@ -70,7 +67,6 @@ def delete_product(db: Session, user_id: int, product_id: int) -> bool:
     return True
 
 def create_sale(db: Session, user_id: int, data: SaleCreate) -> Sale:
-    # 1) Validar productos (del usuario) y stock
     products_map: dict[int, Product] = {}
 
     for it in data.items:
@@ -91,21 +87,20 @@ def create_sale(db: Session, user_id: int, data: SaleCreate) -> Sale:
             )
         products_map[it.product_id] = p
 
-    # 2) Crear venta y items (precio del backend)
     sale = Sale(
         user_id=user_id,
         total=0,
         payment_method=data.payment_method,
     )
     db.add(sale)
-    db.flush()  # para tener sale.id
+    db.flush()
 
     total = 0.0
 
     for it in data.items:
         p = products_map[it.product_id]
 
-        unit_price = float(p.price)  # SOURCE OF TRUTH
+        unit_price = float(p.price)
         line_total = float(it.qty) * unit_price
         total += line_total
 
@@ -118,10 +113,8 @@ def create_sale(db: Session, user_id: int, data: SaleCreate) -> Sale:
             )
         )
 
-        # descontar stock
         p.stock -= int(it.qty)
 
-        # registrar movimiento
         db.add(
             StockMovement(
                 user_id=user_id,
@@ -149,7 +142,7 @@ def list_sales(db: Session, user_id: int) -> list[Sale]:
 
 def _range_to_datetimes(from_date: date, to_date: date) -> tuple[datetime, datetime]:
     start = datetime.combine(from_date, time.min)
-    end = datetime.combine(to_date + timedelta(days=1), time.min)  # exclusivo
+    end = datetime.combine(to_date + timedelta(days=1), time.min)
     return start, end
 
 def sales_summary(db: Session, user_id: int, from_date: date, to_date: date) -> dict:
@@ -173,7 +166,6 @@ def sales_summary(db: Session, user_id: int, from_date: date, to_date: date) -> 
         pm = s.payment_method or "UNSPECIFIED"
         by_payment[pm] = by_payment.get(pm, 0.0) + float(s.total)
 
-    # redondeo a 2 decimales
     by_payment = {k: round(v, 2) for k, v in by_payment.items()}
 
     return {
@@ -224,7 +216,6 @@ def sales_daily(db: Session, user_id: int, from_date: date, to_date: date) -> li
         .all()
     )
 
-    # Agrupar en Python por (YYYY-MM-DD)
     by_day: dict[str, dict] = {}
     for s in sales:
         day = s.created_at.date().isoformat()
@@ -243,7 +234,6 @@ def sales_daily(db: Session, user_id: int, from_date: date, to_date: date) -> li
         by_day[day]["total"] += amount
         by_day[day]["by_payment_method"][pm] = by_day[day]["by_payment_method"].get(pm, 0.0) + amount
 
-    # Normalizar y ordenar
     out = []
     for day in sorted(by_day.keys()):
         row = by_day[day]

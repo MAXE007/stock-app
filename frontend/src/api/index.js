@@ -10,7 +10,6 @@ export function register(email, password) {
 }
 
 export async function login(email, password) {
-  // OAuth2PasswordRequestForm usa form-data con username/password
   const body = new URLSearchParams();
   body.set("username", email);
   body.set("password", password);
@@ -31,7 +30,7 @@ export async function login(email, password) {
     err.status = res.status;
     throw err;
   }
-  return res.json(); // {access_token, token_type}
+  return res.json();
 }
 
 export function getMe() {

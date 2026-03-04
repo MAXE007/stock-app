@@ -4,18 +4,19 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from app.db import Base
 from app import models
+from app.config import get_settings
+settings = get_settings()
 
-# Alembic Config object
 config = context.config
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# --- IMPORTANTE: enganchar metadata de tus modelos ---
-# Esto hace que "alembic revision --autogenerate" detecte cambios en app/models.py
-from app.db import Base  # noqa: E402
-import app.models  # noqa: E402  (asegura que se registren los modelos)
+
+from app.db import Base
+import app.models  
 
 target_metadata = Base.metadata
 
@@ -27,7 +28,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        compare_type=True,  # detecta cambios de tipos
+        compare_type=True,
     )
 
     with context.begin_transaction():

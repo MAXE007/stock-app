@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, Numeric, DateTime, func, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, Numeric, DateTime, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 from sqlalchemy import Boolean
@@ -66,13 +66,10 @@ class StockMovement(Base):
 
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False, index=True)
 
-    # positivo = entra stock, negativo = sale stock
     change: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # SALE | RESTOCK | ADJUSTMENT
     reason: Mapped[str] = mapped_column(String(32), nullable=False)
 
-    # ejemplo: "sale:123" o "manual"
     reference: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)

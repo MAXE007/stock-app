@@ -28,7 +28,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     boot();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function login(email, password) {
@@ -41,7 +40,7 @@ export function AuthProvider({ children }) {
 
   async function register(email, password) {
     await api.register(email, password);
-    return login(email, password); // auto-login
+    return login(email, password);
   }
 
   function logout() {

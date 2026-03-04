@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
+from app.config import get_settings
 from .db import Base, engine, get_db
 from . import crud, schemas, models
 from datetime import date
@@ -28,18 +29,19 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise HTTPException(status_code=403, detail="Usuario inactivo")
     return u
 
+settings = get_settings()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/health")
-def health():
-    return {"ok": True}
+@app.get("/health", tags=["health"])
+def health_check():
+    return {"status": "ok"}
 
 @app.post("/products", response_model=schemas.ProductOut)
 def create_product(
@@ -192,7 +194,6 @@ def report_sales_daily_export_csv(
 ):
     data = crud.sales_daily(db, current_user.id, from_date, to_date)
 
-    # Armamos CSV con columnas: date, count_sales, total + cada payment_method
     all_methods = sorted({m for d in data for m in d["by_payment_method"].keys()})
 
     output = io.StringIO()

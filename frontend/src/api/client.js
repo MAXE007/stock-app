@@ -1,9 +1,8 @@
 import { getToken, clearToken } from "../auth/tokenStorage";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 async function parseError(res) {
-  // intenta JSON {detail: ...}
   try {
     const data = await res.json();
     if (typeof data?.detail === "string") return data.detail;
@@ -27,7 +26,6 @@ export async function apiFetch(path, { auth = true, ...options } = {}) {
   if (!res.ok) {
     const message = await parseError(res);
 
-    // si el token quedó inválido/expiró
     if (res.status === 401) {
       clearToken();
     }
@@ -37,7 +35,6 @@ export async function apiFetch(path, { auth = true, ...options } = {}) {
     throw err;
   }
 
-  // 204 No Content
   if (res.status === 204) return null;
 
   return res.json();
